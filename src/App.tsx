@@ -9,6 +9,7 @@ import StudentDashboard from './pages/student/Dashboard';
 import StudentCourses from './pages/student/Courses';
 import StudentAnnouncements from './pages/student/Announcements';
 import StudentAdvisor from './pages/student/Advisor';
+import StudentComplaints from './pages/student/Complaints';
 
 import AdvisorDashboard from './pages/advisor/Dashboard';
 import AdvisorStudents from './pages/advisor/Students';
@@ -43,6 +44,7 @@ function App() {
           <Route path="/student/courses" element={<ProtectedRoute allowedRoles={['student']}><StudentCourses /></ProtectedRoute>} />
           <Route path="/student/announcements" element={<ProtectedRoute allowedRoles={['student']}><StudentAnnouncements /></ProtectedRoute>} />
           <Route path="/student/advisor" element={<ProtectedRoute allowedRoles={['student']}><StudentAdvisor /></ProtectedRoute>} />
+          <Route path="/student/complaints" element={<ProtectedRoute allowedRoles={['student']}><StudentComplaints /></ProtectedRoute>} />
           <Route path="/student/settings" element={<ProtectedRoute allowedRoles={['student']}><Settings /></ProtectedRoute>} />
           
           {/* Advisor Routes */}

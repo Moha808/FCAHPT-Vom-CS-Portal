@@ -9,7 +9,7 @@ export const calculateCGPA = (enrollments: Enrollment[], courses: Course[]) => {
   };
 
   enrollments.forEach(enc => {
-    if (enc.grade && enc.status !== 'pending') {
+    if (enc.grade && enc.status !== 'pending' && enc.status !== 'in_progress') {
       const course = courses.find(c => c.courseCode === enc.courseCode);
       if (course) {
         const points = gradePoints[enc.grade] ?? 0;
@@ -23,23 +23,33 @@ export const calculateCGPA = (enrollments: Enrollment[], courses: Course[]) => {
 };
 
 export const getDegreeAudit = (enrollments: Enrollment[], curriculum: Curriculum | null, courses: Course[]) => {
-  if (!curriculum) return { completedCredits: 0, requiredCredits: 0, percentage: 0, passedCourses: [] };
-
   const passedEnrollments = enrollments.filter(e => e.status === 'passed');
   const passedCourseCodes = passedEnrollments.map(e => e.courseCode);
 
   let requiredCredits = 0;
   let completedCredits = 0;
 
-  curriculum.courses.forEach(req => {
-    const course = courses.find(c => c.courseCode === req.courseCode);
-    if (course) {
+  if (curriculum && curriculum.courses.length > 0) {
+    curriculum.courses.forEach(req => {
+      const course = courses.find(c => c.courseCode === req.courseCode);
+      if (course) {
+        requiredCredits += course.creditUnits;
+        if (passedCourseCodes.includes(course.courseCode)) {
+          completedCredits += course.creditUnits;
+        }
+      }
+    });
+  } else if (courses.length > 0) {
+    courses.forEach(course => {
       requiredCredits += course.creditUnits;
       if (passedCourseCodes.includes(course.courseCode)) {
         completedCredits += course.creditUnits;
       }
-    }
-  });
+    });
+  }
+
+  // Default to 48 required credits if still 0
+  if (requiredCredits === 0) requiredCredits = 48;
 
   const percentage = requiredCredits > 0 ? Math.round((completedCredits / requiredCredits) * 100) : 0;
 
@@ -53,12 +63,10 @@ export const getDegreeAudit = (enrollments: Enrollment[], curriculum: Curriculum
 
 export const getCourseRecommendations = (
   enrollments: Enrollment[], 
-  curriculum: Curriculum | null, 
+  _curriculum: Curriculum | null, 
   courses: Course[], 
   currentLevel: string
 ) => {
-  if (!curriculum) return [];
-
   const passedCourseCodes = enrollments.filter(e => e.status === 'passed').map(e => e.courseCode);
   const failedCourseCodes = enrollments.filter(e => e.status === 'failed').map(e => e.courseCode);
   
@@ -75,19 +83,17 @@ export const getCourseRecommendations = (
     }
   });
 
-  // 2. Next: Curriculum courses for the current level that haven't been passed
-  const levelRequirements = curriculum.courses.filter(req => req.level === currentLevel);
+  // 2. Next: Departmental courses for the current level that haven't been passed
+  const targetLevel = currentLevel.includes('2') ? 'ND 2' : 'ND 1';
+  const levelCourses = courses.filter(c => c.level === targetLevel || c.level === currentLevel);
   
-  levelRequirements.forEach(req => {
-    if (!passedCourseCodes.includes(req.courseCode) && !failedCourseCodes.includes(req.courseCode)) {
-      const course = courses.find(c => c.courseCode === req.courseCode);
-      if (course) {
-        // Check prerequisites
-        const prereqsMet = course.prerequisites.every(prereq => passedCourseCodes.includes(prereq));
-        if (prereqsMet && totalCredits + course.creditUnits <= MAX_CREDITS) {
-          recommendations.push({ ...course, reason: 'Required for level' });
-          totalCredits += course.creditUnits;
-        }
+  levelCourses.forEach(course => {
+    if (!passedCourseCodes.includes(course.courseCode) && !failedCourseCodes.includes(course.courseCode)) {
+      // Check prerequisites
+      const prereqsMet = course.prerequisites.every(prereq => passedCourseCodes.includes(prereq));
+      if (prereqsMet && totalCredits + course.creditUnits <= MAX_CREDITS) {
+        recommendations.push({ ...course, reason: 'Required for Level' });
+        totalCredits += course.creditUnits;
       }
     }
   });

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, BookOpen, Bell, LogOut, Settings,
   Users, Megaphone, BookMarked,
   UserCheck, BarChart3, ShieldCheck, ChevronRight,
-  Menu, X
+  Menu, X, MessageSquare
 } from 'lucide-react';
 
 const navConfig = {
@@ -16,6 +16,7 @@ const navConfig = {
     { label: 'My Courses',     path: '/student/courses',         icon: BookOpen },
     { label: 'Announcements',  path: '/student/announcements',   icon: Bell },
     { label: 'My Advisor',     path: '/student/advisor',         icon: UserCheck },
+    { label: 'Complaints',     path: '/student/complaints',      icon: MessageSquare },
     { label: 'Settings',       path: '/student/settings',        icon: Settings },
   ],
   advisor: [

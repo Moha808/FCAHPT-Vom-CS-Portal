@@ -15,7 +15,7 @@ export default function AnnouncementsManager() {
   const [formData, setFormData] = useState({
     title: '',
     body: '',
-    audience: 'all' // 'all' or department name
+    audience: 'Computer Science'
   });
 
   useEffect(() => {
@@ -127,10 +127,8 @@ export default function AnnouncementsManager() {
                 onChange={e => setFormData({...formData, audience: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-vom-green bg-white"
               >
-                <option value="all">All Students (College-wide)</option>
-                {userData?.department && (
-                  <option value={userData.department}>Only {userData.department} Students</option>
-                )}
+                <option value="Computer Science">Computer Science Department Students</option>
+                <option value="all">All Departments (College-wide)</option>
               </select>
             </div>
             <div className="pt-2">

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -21,6 +22,22 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, userData } = useAuthStore();
+
+  useEffect(() => {
+    if (user && userData) {
+      navigate(`/${userData.role === 'admin' ? 'admin' : userData.role}/dashboard`);
+    }
+  }, [user, userData, navigate]);
+
+  const handleProgramChange = (programVal: string) => {
+    const defaultLevel = programVal.startsWith('HND') ? 'HND 1' : 'ND 1';
+    setFormData(prev => ({
+      ...prev,
+      program: programVal,
+      level: defaultLevel
+    }));
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +55,11 @@ export default function Register() {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        uid: userCredential.user.uid,
+      const uid = userCredential.user.uid;
+
+      // 1. Create user document
+      await setDoc(doc(db, 'users', uid), {
+        uid: uid,
         name: formData.name,
         matricNumber: formData.matricNumber,
         email: formData.email,
@@ -48,7 +68,33 @@ export default function Register() {
         program: formData.program,
         level: formData.level,
       });
-      navigate('/student/dashboard');
+
+      // 2. Fetch courses for student's level & program to automatically seed their courses
+      // Note: HND levels use ND course structure as base curriculum if HND specific courses aren't distinct
+      const targetLevel = formData.level.startsWith('HND') 
+        ? formData.level.replace('HND', 'ND') 
+        : formData.level;
+
+      const coursesSnap = await getDocs(collection(db, 'courses'));
+      const batch = writeBatch(db);
+
+      coursesSnap.docs.forEach(courseDoc => {
+        const course = courseDoc.data();
+        if (course.level === targetLevel || (targetLevel === 'ND 2' && course.level === 'ND 1')) {
+          const enrollmentRef = doc(collection(db, 'enrollments'));
+          batch.set(enrollmentRef, {
+            studentId: uid,
+            courseCode: course.courseCode,
+            semester: course.semester,
+            grade: null,
+            status: 'in_progress',
+            enrolledAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      await batch.commit();
+      // Navigation is now handled by the useEffect once userData is synced
     } catch (err: any) {
       if (err.code === 'auth/email-already-in-use') {
         setError('This email is already registered. Please log in instead.');
@@ -160,18 +206,35 @@ export default function Register() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Program</label>
-                <select name="program" value={formData.program} onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm bg-white">
+                <select 
+                  name="program" 
+                  value={formData.program} 
+                  onChange={(e) => handleProgramChange(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm bg-white"
+                >
                   <option value="ND Computer Science">ND</option>
                   <option value="HND Computer Science">HND</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Level</label>
-                <select name="level" value={formData.level} onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm bg-white">
-                  <option value="ND 1">Level 1 (ND1 / HND1)</option>
-                  <option value="ND 2">Level 2 (ND2 / HND2)</option>
+                <select 
+                  name="level" 
+                  value={formData.level} 
+                  onChange={handleChange}
+                  className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm bg-white"
+                >
+                  {formData.program.startsWith('HND') ? (
+                    <>
+                      <option value="HND 1">HND 1</option>
+                      <option value="HND 2">HND 2</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="ND 1">ND 1</option>
+                      <option value="ND 2">ND 2</option>
+                    </>
+                  )}
                 </select>
               </div>
             </div>

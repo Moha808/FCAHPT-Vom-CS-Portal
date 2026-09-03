@@ -5,9 +5,29 @@ export interface UserData {
   name: string;
   email: string;
   role: Role;
+  matricNumber?: string;
+  phone?: string;
   department?: string;
   program?: string;
   level?: string;
+  advisorId?: string;
+  advisorName?: string;
+  advisorEmail?: string;
+  advisorPhone?: string;
+}
+
+export interface Complaint {
+  id?: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  studentMatric?: string;
+  category: string;
+  subject: string;
+  message: string;
+  status: 'pending' | 'resolved';
+  response?: string;
+  createdAt: string;
 }
 
 export interface Course {
@@ -25,9 +45,12 @@ export interface Enrollment {
   studentId: string;
   courseCode: string;
   semester: number;
-  session: string;
-  grade: string | null;
-  status: 'passed' | 'failed' | 'pending';
+  session?: string;
+  grade?: string | null;
+  status: 'passed' | 'failed' | 'pending' | 'in_progress';
+  gradedBy?: string;
+  gradedAt?: string;
+  enrolledAt?: string;
 }
 
 export interface Curriculum {

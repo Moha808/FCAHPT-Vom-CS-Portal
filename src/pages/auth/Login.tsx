@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth } from '../../lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -11,6 +12,13 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, userData } = useAuthStore();
+
+  useEffect(() => {
+    if (user && userData) {
+      navigate(`/${userData.role === 'admin' ? 'admin' : userData.role}/dashboard`);
+    }
+  }, [user, userData, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +26,7 @@ export default function Login() {
     setError('');
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate('/student/dashboard');
+      // Navigation is now handled by the useEffect once userData is fetched
     } catch (err: any) {
       setError('Invalid email or password. Please try again.');
       setLoading(false);

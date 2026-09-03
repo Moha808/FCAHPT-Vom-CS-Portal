@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, addDoc } from 'firebase/firestore';
 import { UserData } from '../../types';
 import { Users, ShieldCheck, GraduationCap, UserPlus, X, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import ToastModal from '../../components/ToastModal';
@@ -35,7 +35,6 @@ export default function AdminDashboard() {
     try {
       const updates: any = { role: newRole };
       
-      // If changing to admin, we probably want to clear out student-specific fields
       if (newRole === 'admin') {
         updates.program = '';
         updates.level = '';
@@ -61,18 +60,60 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleAssignAdvisor = async (student: UserData, advisorId: string) => {
+    try {
+      const selectedAdvisor = users.find(u => u.uid === advisorId);
+      const advisorName = selectedAdvisor?.name || 'Departmental Advisor';
+      const advisorEmail = selectedAdvisor?.email || '';
+      const advisorPhone = selectedAdvisor?.phone || '';
+
+      const updates = {
+        advisorId: advisorId,
+        advisorName: advisorName,
+        advisorEmail: advisorEmail,
+        advisorPhone: advisorPhone,
+      };
+
+      // 1. Update student document
+      await updateDoc(doc(db, 'users', student.uid), updates);
+      setUsers(users.map(u => u.uid === student.uid ? { ...u, ...updates } : u));
+
+      // 2. Post notification announcement to both parties
+      await addDoc(collection(db, 'announcements'), {
+        title: `Advisor Assignment: ${student.name}`,
+        content: `Academic Advisor ${advisorName} has been assigned to student ${student.name} (${student.matricNumber || 'Student'}).`,
+        postedBy: 'HOD (Admin)',
+        audience: 'all',
+        createdAt: new Date().toISOString(),
+      });
+
+      setToast({
+        isOpen: true,
+        type: 'success',
+        message: `Assigned Advisor ${advisorName} to ${student.name}. Notification sent!`
+      });
+    } catch (err) {
+      console.error(err);
+      setToast({
+        isOpen: true,
+        type: 'error',
+        message: 'Failed to assign advisor. Check permissions.'
+      });
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vom-green"></div></div>;
 
-  const studentsCount = users.filter(u => u.role === 'student').length;
-  const advisorsCount = users.filter(u => u.role === 'advisor').length;
-  const adminsCount = users.filter(u => u.role === 'admin').length;
+  const students = users.filter(u => u.role === 'student');
+  const advisors = users.filter(u => u.role === 'advisor');
+  const admins = users.filter(u => u.role === 'admin');
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500 mt-1">Manage users and system configuration.</p>
+          <p className="text-gray-500 mt-1">Manage users, assign advisors, and system configuration.</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -85,15 +126,15 @@ export default function AdminDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard icon={<Users className="w-6 h-6" />} label="Total Students" value={studentsCount} color="blue" />
-        <StatCard icon={<GraduationCap className="w-6 h-6" />} label="Total Advisors" value={advisorsCount} color="purple" />
-        <StatCard icon={<ShieldCheck className="w-6 h-6" />} label="Total Admins" value={adminsCount} color="green" />
+        <StatCard icon={<Users className="w-6 h-6" />} label="Total Students" value={students.length} color="blue" />
+        <StatCard icon={<GraduationCap className="w-6 h-6" />} label="Total Advisors" value={advisors.length} color="purple" />
+        <StatCard icon={<ShieldCheck className="w-6 h-6" />} label="Total Admins" value={admins.length} color="green" />
       </div>
 
       {/* User Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-          <h2 className="text-lg font-bold text-gray-900">User Management</h2>
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-900">User Management & Advisor Assignment</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -102,13 +143,14 @@ export default function AdminDashboard() {
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Name</th>
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Email</th>
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Program / Dept</th>
-                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Current Role</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Role</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Assigned Advisor</th>
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Change Role</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {users.length === 0 ? (
-                <tr><td colSpan={5} className="py-8 text-center text-gray-500">No users found.</td></tr>
+                <tr><td colSpan={6} className="py-8 text-center text-gray-500">No users found.</td></tr>
               ) : (
                 users.map(user => (
                   <tr key={user.uid} className="hover:bg-gray-50 transition-colors">
@@ -126,10 +168,26 @@ export default function AdminDashboard() {
                       </span>
                     </td>
                     <td className="py-4 px-6 text-sm">
+                      {user.role === 'student' ? (
+                        <select
+                          value={user.advisorId || ''}
+                          onChange={(e) => handleAssignAdvisor(user, e.target.value)}
+                          className="border border-gray-300 rounded-md text-xs px-2 py-1.5 focus:ring-2 focus:ring-vom-green focus:border-transparent outline-none bg-white max-w-[160px]"
+                        >
+                          <option value="">Select Advisor...</option>
+                          {advisors.map(adv => (
+                            <option key={adv.uid} value={adv.uid}>{adv.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-gray-400 text-xs">N/A</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 text-sm">
                       <select
                         value={user.role}
                         onChange={(e) => handleRoleChange(user.uid, e.target.value as any)}
-                        className="border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:ring-2 focus:ring-vom-green focus:border-transparent outline-none"
+                        className="border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:ring-2 focus:ring-vom-green focus:border-transparent outline-none bg-white"
                       >
                         <option value="student">Student</option>
                         <option value="advisor">Advisor</option>
@@ -183,7 +241,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
 
 // ── Create Staff Modal ─────────────────────────────────────────────────────────
 function CreateStaffModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [formData, setFormData] = useState({ name: '', email: '', role: 'advisor', department: 'Computer Science' });
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', role: 'advisor', department: 'Computer Science' });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -200,7 +258,6 @@ function CreateStaffModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     setLoading(true);
 
     try {
-      // Use Firebase REST API to create a secondary user without signing out the current admin
       const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
       const res = await fetch(
         `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,
@@ -215,13 +272,13 @@ function CreateStaffModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 
       const newUid = data.localId;
 
-      // Write the user document to Firestore
       const { db } = await import('../../lib/firebase');
       const { doc, setDoc } = await import('firebase/firestore');
       await setDoc(doc(db, 'users', newUid), {
         uid: newUid,
         name: formData.name,
         email: formData.email,
+        phone: formData.phone,
         role: formData.role,
         department: formData.department,
       });
@@ -236,9 +293,8 @@ function CreateStaffModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="text-lg font-bold text-gray-900">Create Staff Account</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -273,6 +329,12 @@ function CreateStaffModal({ onClose, onSuccess }: { onClose: () => void; onSucce
               <div>
                 <label className="block text-sm font-medium text-gray-700">Email Address</label>
                 <input type="email" name="email" required value={formData.email} onChange={handleChange}
+                  className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Phone Number (Optional)</label>
+                <input type="text" name="phone" placeholder="e.g. +234 803 000 1234" value={formData.phone} onChange={handleChange}
                   className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm" />
               </div>
 

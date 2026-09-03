@@ -25,7 +25,7 @@ export default function StudentAnnouncements() {
         const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Announcement));
         // Show college-wide and department-specific
         const filtered = all.filter(a =>
-          a.audience === 'all' || a.audience === userData?.department
+          a.audience === 'all' || a.audience === 'Computer Science' || a.audience === userData?.department
         );
         // Sort newest first
         filtered.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));

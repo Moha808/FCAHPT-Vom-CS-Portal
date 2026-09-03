@@ -1,16 +1,34 @@
 import { useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDataStore } from '../../store/useDataStore';
 import { calculateCGPA, getDegreeAudit, getCourseRecommendations } from '../../lib/academicLogic';
 import {
-  AlertTriangle, CheckCircle, BookOpen,
-  GraduationCap, Award, ArrowRight, Clock
+  Award, GraduationCap, CheckCircle2, Clock, AlertTriangle, BookOpen, ChevronRight, TrendingUp
 } from 'lucide-react';
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, BarChart, Bar
-} from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
+import { Link } from 'react-router-dom';
+import { Course, Enrollment } from '../../types';
+
+// Default Computer Science curriculum fallback
+const DEFAULT_CS_COURSES: Course[] = [
+  { courseCode: 'COS101', title: 'Introduction to Computing', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
+  { courseCode: 'MTH101', title: 'Mathematics I', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
+  { courseCode: 'COS102', title: 'Computer Hardware Principles', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
+  { courseCode: 'COS103', title: 'Office Productivity Packages', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
+  { courseCode: 'COM101', title: 'Communication Skills I', creditUnits: 2, department: 'General Studies', level: 'ND 1', semester: 1, prerequisites: [] },
+
+  { courseCode: 'COS104', title: 'Introduction to Programming (Python)', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS101'] },
+  { courseCode: 'MTH102', title: 'Mathematics II', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['MTH101'] },
+  { courseCode: 'COS105', title: 'Operating Systems I', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS102'] },
+  { courseCode: 'COS106', title: 'Data & Information Processing', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS101'] },
+  { courseCode: 'COM102', title: 'Communication Skills II', creditUnits: 2, department: 'General Studies', level: 'ND 1', semester: 2, prerequisites: ['COM101'] },
+
+  { courseCode: 'COS201', title: 'Data Structures & Algorithms', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
+  { courseCode: 'COS202', title: 'Database Management Systems', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS106'] },
+  { courseCode: 'COS203', title: 'Web Technology I (HTML/CSS/JS)', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
+  { courseCode: 'COS204', title: 'Object-Oriented Programming (Java)', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
+  { courseCode: 'COS205', title: 'Computer Networks & Internet Technology', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS105'] },
+];
 
 export default function StudentDashboard() {
   const { userData } = useAuthStore();
@@ -18,21 +36,48 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (userData?.uid && userData?.program) {
-      fetchStudentData(userData.uid, userData.program);
+      fetchStudentData(userData.uid, userData.program, userData.level || 'ND 1');
     }
   }, [userData]);
 
-  const cgpa = useMemo(() => calculateCGPA(enrollments, courses), [enrollments, courses]);
-  const audit = useMemo(() => getDegreeAudit(enrollments, curriculum, courses), [enrollments, curriculum, courses]);
+  const activeCourses = useMemo(() => {
+    return courses.length > 0 ? courses : DEFAULT_CS_COURSES;
+  }, [courses]);
+
+  // Unified enrollments array used for calculations
+  const activeEnrollments = useMemo<Enrollment[]>(() => {
+    if (enrollments.length > 0) return enrollments;
+
+    const rawLevel = (userData?.level || 'ND 1').trim();
+    const targetLevel = rawLevel.includes('2') ? 'ND 2' : 'ND 1';
+
+    const levelCourses = activeCourses.filter(c => 
+      c.level === targetLevel || (targetLevel === 'ND 2' && c.level === 'ND 1')
+    );
+
+    const finalCourses = levelCourses.length > 0 ? levelCourses : activeCourses.filter(c => c.level === 'ND 1');
+
+    return finalCourses.map(c => ({
+      studentId: userData?.uid || 'temp',
+      courseCode: c.courseCode,
+      semester: c.semester,
+      session: '2025/2026',
+      grade: null,
+      status: 'pending',
+    }));
+  }, [enrollments, activeCourses, userData]);
+
+  const cgpa = useMemo(() => calculateCGPA(activeEnrollments, activeCourses), [activeEnrollments, activeCourses]);
+  const audit = useMemo(() => getDegreeAudit(activeEnrollments, curriculum, activeCourses), [activeEnrollments, curriculum, activeCourses]);
   const recommendations = useMemo(() => {
     if (!userData?.level) return [];
-    return getCourseRecommendations(enrollments, curriculum, courses, userData.level);
-  }, [enrollments, curriculum, courses, userData]);
+    return getCourseRecommendations(activeEnrollments, curriculum, activeCourses, userData.level);
+  }, [activeEnrollments, curriculum, activeCourses, userData]);
 
-  const passedCount  = enrollments.filter(e => e.status === 'passed').length;
-  const failedCount  = enrollments.filter(e => e.status === 'failed').length;
-  const pendingCount = enrollments.filter(e => e.status === 'pending').length;
-  const isAtRisk     = parseFloat(cgpa) < 2.0 || failedCount >= 2;
+  const passedCount  = activeEnrollments.filter(e => e.status === 'passed').length;
+  const failedCount  = activeEnrollments.filter(e => e.status === 'failed').length;
+  const pendingCount = activeEnrollments.filter(e => e.status === 'pending' || e.status === 'in_progress').length;
+  const isAtRisk     = parseFloat(cgpa) < 2.0 && passedCount > 0;
 
   const cgpaTrend = [
     { semester: 'Sem 1', cgpa: 0 },
@@ -50,7 +95,7 @@ export default function StudentDashboard() {
     parseFloat(cgpa) >= 3.5 ? 'Distinction' :
     parseFloat(cgpa) >= 3.0 ? 'Upper Credit' :
     parseFloat(cgpa) >= 2.5 ? 'Lower Credit' :
-    parseFloat(cgpa) >= 2.0 ? 'Pass' : 'Fail';
+    parseFloat(cgpa) >= 2.0 ? 'Pass' : 'Awaiting Grading';
 
   if (loading) {
     return (
@@ -88,179 +133,188 @@ export default function StudentDashboard() {
           value={cgpa}
           sub={cgpaLabel}
           icon={<Award className="w-5 h-5" />}
-          color={parseFloat(cgpa) >= 2.0 ? 'green' : 'red'}
+          color={parseFloat(cgpa) >= 2.0 ? 'green' : 'gray'}
         />
         <KpiCard
           label="Credits Earned"
           value={`${audit.completedCredits}`}
-          sub={`of ${audit.requiredCredits} required`}
+          sub={`of ${audit.requiredCredits || 48} required`}
           icon={<GraduationCap className="w-5 h-5" />}
           color="blue"
         />
         <KpiCard
           label="Courses Passed"
           value={`${passedCount}`}
-          sub={`${failedCount} carryover${failedCount !== 1 ? 's' : ''}`}
-          icon={<CheckCircle className="w-5 h-5" />}
-          color="purple"
+          sub={`${failedCount} carryovers`}
+          icon={<CheckCircle2 className="w-5 h-5" />}
+          color="green"
         />
         <KpiCard
           label="Pending Results"
           value={`${pendingCount}`}
           sub="awaiting grading"
           icon={<Clock className="w-5 h-5" />}
-          color="yellow"
+          color="amber"
         />
       </div>
 
-      {/* Progress bar */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="font-bold text-gray-900">Degree Progress</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {audit.completedCredits} of {audit.requiredCredits} credit units completed
-            </p>
+      {/* Progress & Audit Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Progress Card */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="font-bold text-gray-900 text-lg">Degree Completion Progress</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Based on official NBTE Computer Science curriculum</p>
+            </div>
+            <span className="text-2xl font-black text-vom-green">{audit.percentage}%</span>
           </div>
-          <span className="text-3xl font-extrabold text-vom-green">{audit.percentage}%</span>
+
+          {/* Progress bar */}
+          <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden p-0.5">
+            <div
+              className="bg-gradient-to-r from-vom-green to-emerald-400 h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.max(audit.percentage, 2)}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 pt-2 text-center text-xs">
+            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <span className="text-gray-400 font-medium">Earned Units</span>
+              <p className="font-bold text-gray-900 text-sm mt-0.5">{audit.completedCredits} Units</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <span className="text-gray-400 font-medium">Total Program Units</span>
+              <p className="font-bold text-gray-900 text-sm mt-0.5">{audit.requiredCredits || 48} Units</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <span className="text-gray-400 font-medium">Registered Courses</span>
+              <p className="font-bold text-vom-green text-sm mt-0.5">{activeEnrollments.length} Modules</p>
+            </div>
+          </div>
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
-          <div
-            className="h-4 rounded-full bg-gradient-to-r from-vom-green to-vom-green-light transition-all duration-1000"
-            style={{ width: `${audit.percentage}%` }}
-          />
-        </div>
-        <div className="flex justify-between text-xs text-gray-400 mt-2">
-          <span>Start</span>
-          <span>{audit.requiredCredits - audit.completedCredits} credits remaining</span>
-          <span>Graduation</span>
+
+        {/* Course Status Breakdown Donut */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+          <h2 className="font-bold text-gray-900 text-base mb-2">Course Breakdown</h2>
+          <div className="h-40 flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={courseStats}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={45}
+                  outerRadius={65}
+                  dataKey="value"
+                  paddingAngle={3}
+                >
+                  {courseStats.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="flex justify-around text-xs font-semibold pt-2 border-t border-gray-100">
+            <span className="text-vom-green">● Passed ({passedCount})</span>
+            <span className="text-red-500">● Failed ({failedCount})</span>
+            <span className="text-amber-500">● Pending ({pendingCount})</span>
+          </div>
         </div>
       </div>
 
-      {/* Charts + Recommendations */}
+      {/* Recommended Courses & CGPA Trend Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* CGPA trend */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h2 className="font-bold text-gray-900 mb-1">CGPA Trend</h2>
-            <p className="text-xs text-gray-400 mb-4">Performance across semesters</p>
-            <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={cgpaTrend}>
-                  <defs>
-                    <linearGradient id="gc" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#006400" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#006400" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                  <XAxis dataKey="semester" stroke="#9CA3AF" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#9CA3AF" fontSize={11} tickLine={false} axisLine={false} domain={[0, 5]} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgb(0 0 0 / .1)', fontSize: 12 }} />
-                  <Area type="monotone" dataKey="cgpa" stroke="#006400" strokeWidth={2.5} fill="url(#gc)" />
-                </AreaChart>
-              </ResponsiveContainer>
+        {/* Recommended Courses */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="font-bold text-gray-900 text-base">Recommended Courses for Registration</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Automated selection for {userData?.level || 'ND 1'}</p>
             </div>
-          </div>
-
-          {/* Course breakdown bar */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h2 className="font-bold text-gray-900 mb-1">Course Breakdown</h2>
-            <p className="text-xs text-gray-400 mb-4">Summary of your enrollment statuses</p>
-            <div className="h-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={courseStats} barSize={40}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                  <XAxis dataKey="name" stroke="#9CA3AF" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis allowDecimals={false} stroke="#9CA3AF" fontSize={11} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgb(0 0 0/.1)', fontSize: 12 }} />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]}
-                    fill="#006400"
-                    label={false}
-                  >
-                    {courseStats.map((entry, i) => (
-                      <rect key={i} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Recommendations panel */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col">
-          <div className="flex items-center mb-4">
-            <BookOpen className="w-5 h-5 text-vom-gold mr-2" />
-            <h2 className="font-bold text-gray-900">Recommended Next Semester</h2>
+            <Link to="/student/courses" className="text-xs font-bold text-vom-green hover:underline flex items-center">
+              View All <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+            </Link>
           </div>
 
           {recommendations.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
-              <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mb-3">
-                <CheckCircle className="w-6 h-6 text-vom-green" />
-              </div>
-              <p className="font-medium text-gray-700">All caught up!</p>
-              <p className="text-sm text-gray-400 mt-1">No courses to recommend right now.</p>
+            <div className="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-gray-100">
+              <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+              <p className="font-medium text-gray-600">All current semester requirements are registered.</p>
             </div>
           ) : (
-            <div className="space-y-3 flex-1">
-              {recommendations.map(course => (
-                <div key={course.courseCode} className="p-3 rounded-lg bg-gray-50 border border-gray-100 hover:border-vom-green/30 transition-colors">
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="font-bold text-sm text-gray-900">{course.courseCode}</span>
-                    <span className="text-xs bg-white border rounded px-1.5 py-0.5 text-gray-500 font-medium">{course.creditUnits} u</span>
+            <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+              {recommendations.slice(0, 5).map(rec => (
+                <div key={rec.courseCode} className="p-3.5 flex items-center justify-between hover:bg-gray-50/50">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xs font-bold text-vom-green bg-emerald-50 px-2 py-1 rounded">
+                      {rec.courseCode}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{rec.title}</p>
+                      <p className="text-xs text-gray-400">Semester {rec.semester} • {rec.creditUnits} Units</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2 truncate">{course.title}</p>
-                  <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    course.reason === 'Carryover'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
-                  }`}>
-                    {course.reason === 'Carryover' && <AlertTriangle className="w-3 h-3 mr-1" />}
-                    {course.reason}
+                  <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">
+                    {rec.reason}
                   </span>
                 </div>
               ))}
-              <div className="pt-3 border-t border-gray-100 flex justify-between text-sm font-bold text-gray-800">
-                <span>Total Units</span>
-                <span>{recommendations.reduce((s, c) => s + c.creditUnits, 0)}</span>
-              </div>
             </div>
           )}
+        </div>
 
-          <Link
-            to="/student/courses"
-            className="mt-4 flex items-center justify-center text-sm text-vom-green font-semibold hover:underline"
-          >
-            View full course history <ArrowRight className="w-4 h-4 ml-1" />
-          </Link>
+        {/* CGPA Trend Chart */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="font-bold text-gray-900 text-base">CGPA Progression</h2>
+            <TrendingUp className="w-4 h-4 text-vom-green" />
+          </div>
+          <div className="h-44">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={cgpaTrend}>
+                <XAxis dataKey="semester" stroke="#9ca3af" fontSize={11} />
+                <YAxis domain={[0, 4.0]} stroke="#9ca3af" fontSize={11} />
+                <Tooltip />
+                <Line type="monotone" dataKey="cgpa" stroke="#006400" strokeWidth={3} dot={{ fill: '#006400', r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── KPI Card ──────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, icon, color }: {
-  label: string; value: string; sub: string;
-  icon: React.ReactNode; color: string;
+// ── KPI Card Component ──────────────────────────────────────────────────────────
+function KpiCard({
+  label, value, sub, icon, color
+}: {
+  label: string; value: string; sub: string; icon: React.ReactNode; color: string;
 }) {
-  const colors: Record<string, string> = {
-    green:  'bg-green-100 text-vom-green',
-    red:    'bg-red-100 text-red-600',
-    blue:   'bg-blue-100 text-blue-600',
-    purple: 'bg-purple-100 text-purple-600',
-    yellow: 'bg-yellow-100 text-yellow-600',
+  const colorStyles: Record<string, { bg: string; iconBg: string; text: string }> = {
+    green: { bg: 'bg-emerald-50/50', iconBg: 'bg-emerald-100 text-vom-green', text: 'text-vom-green' },
+    blue:  { bg: 'bg-blue-50/50',    iconBg: 'bg-blue-100 text-blue-600',    text: 'text-blue-600' },
+    amber: { bg: 'bg-amber-50/50',   iconBg: 'bg-amber-100 text-amber-600',  text: 'text-amber-600' },
+    red:   { bg: 'bg-red-50/50',     iconBg: 'bg-red-100 text-red-600',      text: 'text-red-600' },
+    gray:  { bg: 'bg-gray-50/50',    iconBg: 'bg-gray-100 text-gray-600',    text: 'text-gray-700' },
   };
+
+  const style = colorStyles[color] || colorStyles.gray;
+
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</p>
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colors[color]}`}>{icon}</div>
+    <div className={`p-5 rounded-2xl border border-gray-100 shadow-xs ${style.bg} space-y-3`}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</span>
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${style.iconBg}`}>{icon}</div>
       </div>
-      <p className="text-2xl font-extrabold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{sub}</p>
+      <div>
+        <p className="text-2xl font-black text-gray-900 tracking-tight">{value}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{sub}</p>
+      </div>
     </div>
   );
 }

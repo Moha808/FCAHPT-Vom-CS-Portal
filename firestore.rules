@@ -2,61 +2,8 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || getUserRole() in ['admin', 'advisor']);
-      allow write: if isAuthenticated() && (request.auth.uid == userId || getUserRole() == 'admin');
-    }
-
-    match /courses/{courseId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && getUserRole() == 'admin';
-    }
-
-    match /curricula/{curriculumId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && getUserRole() == 'admin';
-    }
-
-    match /enrollments/{enrollmentId} {
-      allow read: if isAuthenticated() && (
-        resource.data.studentId == request.auth.uid || 
-        getUserRole() in ['admin', 'advisor']
-      );
-      allow write: if isAuthenticated() && getUserRole() in ['admin', 'advisor'];
-    }
-
-    match /advisorAssignments/{assignmentId} {
-      allow read: if isAuthenticated() && (
-        resource.data.studentId == request.auth.uid || 
-        resource.data.advisorId == request.auth.uid ||
-        getUserRole() == 'admin'
-      );
-      allow write: if isAuthenticated() && getUserRole() == 'admin';
-    }
-
-    match /announcements/{announcementId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && getUserRole() in ['admin', 'advisor'];
-    }
-
-    match /advisorNotes/{noteId} {
-      allow read: if isAuthenticated() && (
-        resource.data.advisorId == request.auth.uid || 
-        getUserRole() == 'admin'
-      );
-      allow write: if isAuthenticated() && (
-        resource.data.advisorId == request.auth.uid || 
-        getUserRole() == 'admin'
-      );
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }

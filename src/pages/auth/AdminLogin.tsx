@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '../../lib/firebase';
+import { auth } from '../../lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { ShieldCheck, Eye, EyeOff, AlertCircle, Lock } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -12,6 +12,21 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, userData } = useAuthStore();
+
+  useEffect(() => {
+    if (user && userData) {
+      if (userData.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (userData.role === 'advisor') {
+        navigate('/advisor/dashboard');
+      } else {
+        auth.signOut();
+        setError('Unauthorized access. This portal is for staff and administrators only.');
+        setLoading(false);
+      }
+    }
+  }, [user, userData, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,30 +34,8 @@ export default function AdminLogin() {
     setError('');
 
     try {
-      const credential = await signInWithEmailAndPassword(auth, email, password);
-
-      // Fetch the user's role from Firestore
-      const userDoc = await getDoc(doc(db, 'users', credential.user.uid));
-
-      if (!userDoc.exists()) {
-        await auth.signOut();
-        setError('No account record found. Contact the system administrator.');
-        setLoading(false);
-        return;
-      }
-
-      const role = userDoc.data().role;
-
-      if (role === 'admin') {
-        navigate('/admin/dashboard');
-      } else if (role === 'advisor') {
-        navigate('/advisor/dashboard');
-      } else {
-        // Student tried to use the staff portal — sign them out immediately
-        await auth.signOut();
-        setError('Access denied. This portal is for authorized staff only.');
-        setLoading(false);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      // Navigation is handled by useEffect once userData is synced
     } catch (err: any) {
       if (
         err.code === 'auth/invalid-credential' ||
