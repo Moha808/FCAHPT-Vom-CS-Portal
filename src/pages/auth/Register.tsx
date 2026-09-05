@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -22,13 +21,6 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, userData } = useAuthStore();
-
-  useEffect(() => {
-    if (user && userData) {
-      navigate(`/${userData.role === 'admin' ? 'admin' : userData.role}/dashboard`);
-    }
-  }, [user, userData, navigate]);
 
   const handleProgramChange = (programVal: string) => {
     const defaultLevel = programVal.startsWith('HND') ? 'HND 1' : 'ND 1';
@@ -70,17 +62,24 @@ export default function Register() {
       });
 
       // 2. Fetch courses for student's level & program to automatically seed their courses
-      // Note: HND levels use ND course structure as base curriculum if HND specific courses aren't distinct
-      const targetLevel = formData.level.startsWith('HND') 
-        ? formData.level.replace('HND', 'ND') 
-        : formData.level;
-
       const coursesSnap = await getDocs(collection(db, 'courses'));
       const batch = writeBatch(db);
 
-      coursesSnap.docs.forEach(courseDoc => {
-        const course = courseDoc.data();
-        if (course.level === targetLevel || (targetLevel === 'ND 2' && course.level === 'ND 1')) {
+      let sourceCourses = [];
+      if (!coursesSnap.empty) {
+        sourceCourses = coursesSnap.docs.map(doc => doc.data() as any);
+      } else {
+        const { getDefaultCourses } = await import('../../lib/defaultCourses');
+        sourceCourses = getDefaultCourses(formData.program, formData.level);
+      }
+
+      // Filter by level (getDefaultCourses already filters, but for DB fallback we need to filter here)
+      sourceCourses.forEach(course => {
+        // If from DB, filter it. If from defaultCourses, it's already filtered, but this logic is safe.
+        if (
+          course.level === formData.level || 
+          (formData.level.includes('2') && course.level.includes('1'))
+        ) {
           const enrollmentRef = doc(collection(db, 'enrollments'));
           batch.set(enrollmentRef, {
             studentId: uid,
@@ -94,7 +93,7 @@ export default function Register() {
       });
 
       await batch.commit();
-      // Navigation is now handled by the useEffect once userData is synced
+      navigate('/student/dashboard');
     } catch (err: any) {
       if (err.code === 'auth/email-already-in-use') {
         setError('This email is already registered. Please log in instead.');

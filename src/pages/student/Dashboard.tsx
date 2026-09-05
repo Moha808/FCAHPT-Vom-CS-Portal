@@ -2,33 +2,13 @@ import { useEffect, useMemo } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDataStore } from '../../store/useDataStore';
 import { calculateCGPA, getDegreeAudit, getCourseRecommendations } from '../../lib/academicLogic';
+import { getDefaultCourses } from '../../lib/defaultCourses';
 import {
   Award, GraduationCap, CheckCircle2, Clock, AlertTriangle, BookOpen, ChevronRight, TrendingUp
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
-import { Course, Enrollment } from '../../types';
-
-// Default Computer Science curriculum fallback
-const DEFAULT_CS_COURSES: Course[] = [
-  { courseCode: 'COS101', title: 'Introduction to Computing', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'MTH101', title: 'Mathematics I', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COS102', title: 'Computer Hardware Principles', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COS103', title: 'Office Productivity Packages', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COM101', title: 'Communication Skills I', creditUnits: 2, department: 'General Studies', level: 'ND 1', semester: 1, prerequisites: [] },
-
-  { courseCode: 'COS104', title: 'Introduction to Programming (Python)', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS101'] },
-  { courseCode: 'MTH102', title: 'Mathematics II', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['MTH101'] },
-  { courseCode: 'COS105', title: 'Operating Systems I', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS102'] },
-  { courseCode: 'COS106', title: 'Data & Information Processing', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS101'] },
-  { courseCode: 'COM102', title: 'Communication Skills II', creditUnits: 2, department: 'General Studies', level: 'ND 1', semester: 2, prerequisites: ['COM101'] },
-
-  { courseCode: 'COS201', title: 'Data Structures & Algorithms', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS202', title: 'Database Management Systems', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS106'] },
-  { courseCode: 'COS203', title: 'Web Technology I (HTML/CSS/JS)', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS204', title: 'Object-Oriented Programming (Java)', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS205', title: 'Computer Networks & Internet Technology', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS105'] },
-];
+import { Enrollment } from '../../types';
 
 export default function StudentDashboard() {
   const { userData } = useAuthStore();
@@ -41,8 +21,10 @@ export default function StudentDashboard() {
   }, [userData]);
 
   const activeCourses = useMemo(() => {
-    return courses.length > 0 ? courses : DEFAULT_CS_COURSES;
-  }, [courses]);
+    return courses.length > 0 
+      ? courses 
+      : getDefaultCourses(userData?.program || '', userData?.level || '');
+  }, [courses, userData]);
 
   // Unified enrollments array used for calculations
   const activeEnrollments = useMemo<Enrollment[]>(() => {
@@ -112,7 +94,7 @@ export default function StudentDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Welcome back, {userData?.name?.split(' ')[0]} 👋
+            Welcome, {userData?.name?.split(' ')[0]}
           </h1>
           <p className="text-gray-500 mt-0.5 text-sm">
             {userData?.program} &nbsp;•&nbsp; {userData?.level} &nbsp;•&nbsp; Dept. of Computer Science

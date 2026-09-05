@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth } from '../../lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,21 +11,31 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, userData } = useAuthStore();
 
-  useEffect(() => {
-    if (user && userData) {
-      navigate(`/${userData.role === 'admin' ? 'admin' : userData.role}/dashboard`);
-    }
-  }, [user, userData, navigate]);
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // Navigation is now handled by the useEffect once userData is fetched
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Fetch user data directly to ensure immediate navigation without race conditions
+      const { getDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../../lib/firebase');
+      
+      const docRef = doc(db, 'users', userCredential.user.uid);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // The global useAuthListener will eventually sync, but we navigate now
+        navigate(`/${data.role === 'admin' ? 'admin' : data.role}/dashboard`);
+      } else {
+        setError('No user data found. Please contact administration.');
+        setLoading(false);
+      }
     } catch (err: any) {
       setError('Invalid email or password. Please try again.');
       setLoading(false);

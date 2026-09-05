@@ -369,6 +369,53 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Curriculum Section */}
+      <section id="curriculum" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <span className="text-vom-green font-bold text-xs uppercase tracking-widest bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-100">
+              Academic Programs
+            </span>
+            <h2 className="text-3xl font-extrabold text-gray-900 mt-4">Department Curricula</h2>
+            <p className="mt-4 text-gray-600">
+              Explore our NBTE-approved courses spanning National Diploma and Higher National Diploma specializations.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
+              <h3 className="font-bold text-xl text-gray-900 mb-2">ND Computer Science</h3>
+              <p className="text-sm text-gray-500 mb-4">Core foundation in programming, networking, and system analysis.</p>
+              <ul className="space-y-2 text-sm text-gray-600 mb-6">
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> Intro to Computing</li>
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> Java Programming</li>
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> Data Structures</li>
+              </ul>
+            </div>
+            
+            <div className="border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
+              <h3 className="font-bold text-xl text-gray-900 mb-2">HND Networking</h3>
+              <p className="text-sm text-gray-500 mb-4">Advanced study in cloud architecture and enterprise networks.</p>
+              <ul className="space-y-2 text-sm text-gray-600 mb-6">
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> Cloud Automation</li>
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> Network Security</li>
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> Routing & Switching</li>
+              </ul>
+            </div>
+
+            <div className="border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
+              <h3 className="font-bold text-xl text-gray-900 mb-2">HND Software Dev</h3>
+              <p className="text-sm text-gray-500 mb-4">Full-stack engineering and software project management.</p>
+              <ul className="space-y-2 text-sm text-gray-600 mb-6">
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> Advanced Software Eng</li>
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> Mobile App Dev</li>
+                <li className="flex items-center"><CheckCircle2 className="w-4 h-4 text-vom-green mr-2" /> API Design</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-vom-green to-emerald-800 text-white text-center">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">

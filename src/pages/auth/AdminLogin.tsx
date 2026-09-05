@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { ShieldCheck, Eye, EyeOff, AlertCircle, Lock } from 'lucide-react';
-import { useAuthStore } from '../../store/useAuthStore';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -12,21 +11,6 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, userData } = useAuthStore();
-
-  useEffect(() => {
-    if (user && userData) {
-      if (userData.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else if (userData.role === 'advisor') {
-        navigate('/advisor/dashboard');
-      } else {
-        auth.signOut();
-        setError('Unauthorized access. This portal is for staff and administrators only.');
-        setLoading(false);
-      }
-    }
-  }, [user, userData, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +18,30 @@ export default function AdminLogin() {
     setError('');
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // Navigation is handled by useEffect once userData is synced
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      const { getDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../../lib/firebase');
+      
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      
+      if (!userDoc.exists()) {
+        await auth.signOut();
+        setError('No account record found. Contact the system administrator.');
+        setLoading(false);
+        return;
+      }
+      
+      const role = userDoc.data().role;
+      if (role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (role === 'advisor') {
+        navigate('/advisor/dashboard');
+      } else {
+        await auth.signOut();
+        setError('Unauthorized access. This portal is for staff and administrators only.');
+        setLoading(false);
+      }
     } catch (err: any) {
       if (
         err.code === 'auth/invalid-credential' ||

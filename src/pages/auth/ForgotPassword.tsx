@@ -18,7 +18,11 @@ export default function ForgotPassword() {
       await sendPasswordResetEmail(auth, email);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Failed to send reset email. Please check the address and try again.');
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email address.');
+      } else {
+        setError(err.message || 'Failed to send reset email. Please check the address and try again.');
+      }
     } finally {
       setLoading(false);
     }

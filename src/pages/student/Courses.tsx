@@ -1,39 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDataStore } from '../../store/useDataStore';
+import { getDefaultCourses } from '../../lib/defaultCourses';
 import { BookOpen, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
-import { Course } from '../../types';
-
-// Default Computer Science curriculum fallback if Firestore courses collection is empty
-const DEFAULT_CS_COURSES: Course[] = [
-  // ND 1 / HND 1 Semester 1
-  { courseCode: 'COS101', title: 'Introduction to Computing', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'MTH101', title: 'Mathematics I', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COS102', title: 'Computer Hardware Principles', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COS103', title: 'Office Productivity Packages', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COM101', title: 'Communication Skills I', creditUnits: 2, department: 'General Studies', level: 'ND 1', semester: 1, prerequisites: [] },
-
-  // ND 1 / HND 1 Semester 2
-  { courseCode: 'COS104', title: 'Introduction to Programming (Python)', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS101'] },
-  { courseCode: 'MTH102', title: 'Mathematics II', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['MTH101'] },
-  { courseCode: 'COS105', title: 'Operating Systems I', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS102'] },
-  { courseCode: 'COS106', title: 'Data & Information Processing', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS101'] },
-  { courseCode: 'COM102', title: 'Communication Skills II', creditUnits: 2, department: 'General Studies', level: 'ND 1', semester: 2, prerequisites: ['COM101'] },
-
-  // ND 2 / HND 2 Semester 1
-  { courseCode: 'COS201', title: 'Data Structures & Algorithms', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS202', title: 'Database Management Systems', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS106'] },
-  { courseCode: 'COS203', title: 'Web Technology I (HTML/CSS/JS)', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS204', title: 'Object-Oriented Programming (Java)', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS205', title: 'Computer Networks & Internet Technology', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS105'] },
-
-  // ND 2 / HND 2 Semester 2
-  { courseCode: 'COS206', title: 'Software Engineering Principles', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 2, prerequisites: ['COS201', 'COS204'] },
-  { courseCode: 'COS207', title: 'Web Technology II (Fullstack)', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 2, prerequisites: ['COS203'] },
-  { courseCode: 'COS208', title: 'Network Security & Administration', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 2, prerequisites: ['COS205'] },
-  { courseCode: 'COS209', title: 'Computer Project Seminar', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 2, prerequisites: [] },
-  { courseCode: 'COS210', title: 'Industrial Training SIWES Report', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 2, prerequisites: [] },
-];
 
 export default function StudentCourses() {
   const { userData } = useAuthStore();
@@ -48,7 +17,7 @@ export default function StudentCourses() {
   const displayCourses = useMemo(() => {
     // 1. If explicit enrollments exist in Firestore for this student, display them
     if (enrollments.length > 0) {
-      const activeCourseList = courses.length > 0 ? courses : DEFAULT_CS_COURSES;
+      const activeCourseList = courses.length > 0 ? courses : getDefaultCourses(userData?.program || '', userData?.level || '');
       return enrollments.map(e => {
         const course = activeCourseList.find(c => c.courseCode === e.courseCode);
         return {
@@ -64,7 +33,7 @@ export default function StudentCourses() {
     }
 
     // 2. Fallback: If no enrollments exist in Firestore, derive courses from active/default curriculum
-    const activeCourseList = courses.length > 0 ? courses : DEFAULT_CS_COURSES;
+    const activeCourseList = courses.length > 0 ? courses : getDefaultCourses(userData?.program || '', userData?.level || '');
     const rawLevel = (userData?.level || 'ND 1').trim();
     
     // Normalize level string (e.g. "ND 1", "HND 1", "Level 1")
@@ -78,7 +47,7 @@ export default function StudentCourses() {
     // If still empty (e.g. strict filter mismatch), return all ND 1 default courses
     const finalCourses = matchingCourses.length > 0 
       ? matchingCourses 
-      : DEFAULT_CS_COURSES.filter(c => c.level === 'ND 1');
+      : getDefaultCourses(userData?.program || '', 'ND 1');
 
     return finalCourses.map(c => {
       return {

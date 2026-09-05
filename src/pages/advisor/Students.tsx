@@ -7,26 +7,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { Search, AlertTriangle, ChevronRight, X, User, BookOpen, FileText, Save, CheckCircle } from 'lucide-react';
 import ToastModal from '../../components/ToastModal';
 
-// Default Computer Science curriculum fallback
-const DEFAULT_CS_COURSES: Course[] = [
-  { courseCode: 'COS101', title: 'Introduction to Computing', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'MTH101', title: 'Mathematics I', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COS102', title: 'Computer Hardware Principles', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COS103', title: 'Office Productivity Packages', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 1, prerequisites: [] },
-  { courseCode: 'COM101', title: 'Communication Skills I', creditUnits: 2, department: 'General Studies', level: 'ND 1', semester: 1, prerequisites: [] },
-
-  { courseCode: 'COS104', title: 'Introduction to Programming (Python)', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS101'] },
-  { courseCode: 'MTH102', title: 'Mathematics II', creditUnits: 3, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['MTH101'] },
-  { courseCode: 'COS105', title: 'Operating Systems I', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS102'] },
-  { courseCode: 'COS106', title: 'Data & Information Processing', creditUnits: 2, department: 'Computer Science', level: 'ND 1', semester: 2, prerequisites: ['COS101'] },
-  { courseCode: 'COM102', title: 'Communication Skills II', creditUnits: 2, department: 'General Studies', level: 'ND 1', semester: 2, prerequisites: ['COM101'] },
-
-  { courseCode: 'COS201', title: 'Data Structures & Algorithms', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS202', title: 'Database Management Systems', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS106'] },
-  { courseCode: 'COS203', title: 'Web Technology I (HTML/CSS/JS)', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS204', title: 'Object-Oriented Programming (Java)', creditUnits: 3, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS104'] },
-  { courseCode: 'COS205', title: 'Computer Networks & Internet Technology', creditUnits: 2, department: 'Computer Science', level: 'ND 2', semester: 1, prerequisites: ['COS105'] },
-];
+import { ALL_COURSES } from '../../lib/defaultCourses';
 
 export default function AdvisorStudents() {
   const { userData } = useAuthStore();
@@ -58,7 +39,7 @@ export default function AdvisorStudents() {
       setEnrollments(allEnrollments);
       
       const coursesSnap = await getDocs(collection(db, 'courses'));
-      const allCourses = coursesSnap.docs.length > 0 ? coursesSnap.docs.map(doc => doc.data() as Course) : DEFAULT_CS_COURSES;
+      const allCourses = coursesSnap.docs.length > 0 ? coursesSnap.docs.map(doc => doc.data() as Course) : ALL_COURSES;
       setCourses(allCourses);
 
       const enrichedStudents = studentData.map(student => {
@@ -167,7 +148,7 @@ export default function AdvisorStudents() {
         <StudentDetailModal 
           student={selectedStudent} 
           studentEnrollments={enrollments.filter(e => e.studentId === selectedStudent.uid)}
-          courses={courses.length > 0 ? courses : DEFAULT_CS_COURSES}
+          courses={courses.length > 0 ? courses : ALL_COURSES}
           onClose={() => setSelectedStudent(null)} 
           onRefreshData={fetchStudentsAndData}
         />
