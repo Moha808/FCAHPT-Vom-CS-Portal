@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, doc, setDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, writeBatch, addDoc } from 'firebase/firestore';
 import { UserData, Enrollment, Course } from '../../types';
 import { calculateCGPA, getCGPACategory } from '../../lib/academicLogic';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Search, AlertTriangle, ChevronRight, X, User, BookOpen, FileText, Save, CheckCircle } from 'lucide-react';
+import { Search, AlertTriangle, ChevronRight, X, User, BookOpen, Save } from 'lucide-react';
 import ToastModal from '../../components/ToastModal';
 
 import { ALL_COURSES } from '../../lib/defaultCourses';
 
-export default function AdvisorStudents() {
-  const { userData } = useAuthStore();
+export default function AdminRecords() {
   const [students, setStudents] = useState<(UserData & { cgpa: string, cgpaCategory: string, carryovers: number })[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -20,17 +19,11 @@ export default function AdvisorStudents() {
 
   useEffect(() => {
     fetchStudentsAndData();
-  }, [userData]);
+  }, []);
 
   const fetchStudentsAndData = async () => {
     try {
-      if (!userData?.uid) return;
-
-      const q = query(
-        collection(db, 'users'), 
-        where('role', '==', 'student'),
-        where('advisorId', '==', userData.uid)
-      );
+      const q = query(collection(db, 'users'), where('role', '==', 'student'));
       const snap = await getDocs(q);
       const studentData = snap.docs.map(doc => doc.data() as UserData);
 
@@ -57,15 +50,15 @@ export default function AdvisorStudents() {
     }
   };
 
-  if (loading) return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vom-green"></div></div>;
+  if (loading) return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vom-gold"></div></div>;
 
-  const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.matricNumber?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">My Advisees</h1>
-        <p className="text-gray-500 mt-1 text-sm">Full roster of your assigned advisees. Click any student to grade courses & save advisor guidance.</p>
+        <h1 className="text-2xl font-bold text-gray-900">Academic Records</h1>
+        <p className="text-gray-500 mt-1 text-sm">Full roster of all students. Click any student to manage their academic records and course grades.</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -78,7 +71,7 @@ export default function AdvisorStudents() {
               placeholder="Search students..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-vom-green w-full"
+              className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-vom-gold w-full"
             />
           </div>
         </div>
@@ -105,10 +98,10 @@ export default function AdvisorStudents() {
                     <tr 
                       key={student.uid} 
                       onClick={() => setSelectedStudent(student)}
-                      className="hover:bg-emerald-50/40 cursor-pointer transition-colors group"
+                      className="hover:bg-gray-50/80 cursor-pointer transition-colors group"
                     >
                       <td className="py-4 px-6 text-sm font-bold text-gray-900 flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-vom-green/10 text-vom-green font-bold text-xs flex items-center justify-center mr-3">
+                        <div className="w-8 h-8 rounded-full bg-vom-gold/20 text-vom-gold font-bold text-xs flex items-center justify-center mr-3">
                           {student.name.charAt(0)}
                         </div>
                         {student.name}
@@ -116,7 +109,7 @@ export default function AdvisorStudents() {
                       <td className="py-4 px-6 text-sm text-gray-600 font-mono">{student.matricNumber || '—'}</td>
                       <td className="py-4 px-6 text-sm text-gray-600">
                         {student.program}<br/>
-                        <span className="text-xs font-semibold text-vom-green">{student.level}</span>
+                        <span className="text-xs font-semibold text-vom-gold">{student.level}</span>
                       </td>
                       <td className="py-4 px-6 text-sm font-bold text-gray-900">{student.cgpa}</td>
                       <td className="py-4 px-6 text-sm">
@@ -131,7 +124,7 @@ export default function AdvisorStudents() {
                         )}
                       </td>
                       <td className="py-4 px-6 text-sm text-right">
-                        <button className="text-gray-400 group-hover:text-vom-green p-2 rounded-lg group-hover:bg-white transition-colors">
+                        <button className="text-gray-400 group-hover:text-vom-gold p-2 rounded-lg group-hover:bg-white transition-colors">
                           <ChevronRight className="w-5 h-5" />
                         </button>
                       </td>
@@ -144,35 +137,36 @@ export default function AdvisorStudents() {
         </div>
       </div>
 
-      {/* Student Detail Modal */}
+      {/* Admin Grade Management Modal */}
       {selectedStudent && (
-        <StudentDetailModal 
+        <GradeManagementModal 
           student={selectedStudent} 
           studentEnrollments={enrollments.filter(e => e.studentId === selectedStudent.uid)}
           courses={courses.length > 0 ? courses : ALL_COURSES}
           onClose={() => setSelectedStudent(null)} 
+          onRefreshData={fetchStudentsAndData}
         />
       )}
     </div>
   );
 }
 
-// ── Student Detail & Grading Modal Component ───────────────────────────────────
-function StudentDetailModal({ 
+// ── Admin Grading Modal Component ───────────────────────────────────
+function GradeManagementModal({ 
   student, 
   studentEnrollments, 
   courses, 
   onClose,
+  onRefreshData
 }: { 
   student: UserData & { cgpa: string, cgpaCategory: string, carryovers: number };
   studentEnrollments: Enrollment[];
   courses: Course[];
   onClose: () => void;
+  onRefreshData: () => void;
 }) {
   const { userData } = useAuthStore();
-  const [noteText, setNoteText] = useState('');
   const [savingData, setSavingData] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(false);
   const [toast, setToast] = useState<{ isOpen: boolean; type: 'success' | 'error'; message: string }>({
     isOpen: false,
     type: 'success',
@@ -185,68 +179,118 @@ function StudentDetailModal({
   const levelCourses = courses.filter(c => c.level === targetLevel || (targetLevel === 'ND 2' && c.level === 'ND 1'));
   const activeCourseList = levelCourses.length > 0 ? levelCourses : courses.filter(c => c.level === 'ND 1');
 
-  useEffect(() => {
-    const fetchNote = async () => {
-      try {
-        const q = query(
-          collection(db, 'advisorNotes'),
-          where('studentId', '==', student.uid)
-        );
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          setNoteText(snap.docs[0].data().note || '');
+  // Local state for editing grades
+  const [gradeState, setGradeState] = useState<Record<string, { grade: string; status: 'passed' | 'failed' | 'pending' | 'in_progress' }>>(() => {
+    const initialMap: Record<string, { grade: string; status: 'passed' | 'failed' | 'pending' | 'in_progress' }> = {};
+    
+    activeCourseList.forEach(c => {
+      const existing = studentEnrollments.find(e => e.courseCode === c.courseCode);
+      initialMap[c.courseCode] = {
+        grade: existing?.grade || '-',
+        status: existing?.status || 'in_progress',
+      };
+    });
+    return initialMap;
+  });
+
+  const handleGradeChange = (courseCode: string, field: 'grade' | 'status', value: string) => {
+    setGradeState(prev => {
+      const current = prev[courseCode] || { grade: '-', status: 'in_progress' };
+      let newGrade = current.grade;
+      let newStatus = current.status;
+
+      if (field === 'grade') {
+        newGrade = value;
+        if (value === 'A' || value === 'B' || value === 'C' || value === 'D') {
+          newStatus = 'passed';
+        } else if (value === 'F') {
+          newStatus = 'failed';
+        } else {
+          newStatus = 'in_progress';
         }
-      } catch (err) {
-        console.error(err);
+      } else if (field === 'status') {
+        newStatus = value as any;
+        if (value === 'in_progress') newGrade = '-';
       }
-    };
-    fetchNote();
-  }, [student.uid]);
+
+      return {
+        ...prev,
+        [courseCode]: { grade: newGrade, status: newStatus }
+      };
+    });
+  };
 
   const handleSaveAll = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingData(true);
-    setSavedSuccess(false);
 
     try {
-      // 1. Save Advisor Note (Advisors can only write notes, not grades)
-      const noteDocRef = doc(db, 'advisorNotes', `${userData?.uid}_${student.uid}`);
-      await setDoc(noteDocRef, {
-        advisorId: userData?.uid,
-        advisorName: userData?.name,
-        studentId: student.uid,
-        studentName: student.name,
-        note: noteText,
-        updatedAt: new Date().toISOString(),
+      const batch = writeBatch(db);
+      activeCourseList.forEach(course => {
+        const state = gradeState[course.courseCode] || { grade: '-', status: 'in_progress' };
+        const enrollmentDocId = `${student.uid}_${course.courseCode}`;
+        const enrollmentRef = doc(db, 'enrollments', enrollmentDocId);
+
+        batch.set(enrollmentRef, {
+          studentId: student.uid,
+          courseCode: course.courseCode,
+          semester: course.semester,
+          grade: state.grade === '-' ? null : state.grade,
+          status: state.status,
+          gradedBy: userData?.name || 'Administrator',
+          gradedAt: new Date().toISOString(),
+        });
       });
 
-      // 2. Send announcement notification to the student
+      // Also calculate new CGPA based on this state
+      const mockUpdatedEnrollments = activeCourseList.map(c => ({
+        courseCode: c.courseCode,
+        grade: gradeState[c.courseCode]?.grade === '-' ? null : gradeState[c.courseCode]?.grade,
+        status: gradeState[c.courseCode]?.status
+      })) as any[];
+      const newCgpa = calculateCGPA(mockUpdatedEnrollments, activeCourseList);
+      const newCategory = getCGPACategory(newCgpa);
+
+      // Save CGPA to User document
+      const userRef = doc(db, 'users', student.uid);
+      batch.update(userRef, {
+        cgpa: newCgpa,
+        cgpaCategory: newCategory,
+        carryovers: mockUpdatedEnrollments.filter(e => e.status === 'failed').length
+      });
+
+      await batch.commit();
+
+      // Send a TARGETED private notification to this specific student only
+      // This goes into a 'notifications' collection scoped to the student's UID
       try {
-        await addDoc(collection(db, 'announcements'), {
-          title: `Advisor Guidance Updated`,
-          content: `Your academic advisor ${userData?.name || 'Advisor'} has updated your guidance notes. Check your portal to view.`,
-          postedBy: userData?.name || 'Academic Advisor',
-          audience: student.department || 'Computer Science',
+        await addDoc(collection(db, 'notifications'), {
+          title: `Grades & Evaluation Updated`,
+          content: `Your official academic records and grades have been reviewed and updated by the administration. Please log in to view your updated results.`,
+          postedBy: userData?.name || 'Academic Administrator',
+          recipientId: student.uid,        // ← only this student receives it
+          recipientName: student.name,
+          type: 'grade_update',
+          isRead: false,
           createdAt: new Date().toISOString(),
         });
       } catch (err) {
-        console.error('Error sending announcement:', err);
+        console.error('Error sending student notification:', err);
       }
 
-      setSavedSuccess(true);
       setToast({
         isOpen: true,
         type: 'success',
-        message: `Successfully saved advisor guidance for ${student.name}!`
+        message: `Successfully saved grades for ${student.name}!`
       });
 
-      setTimeout(() => setSavedSuccess(false), 3000);
+      onRefreshData();
     } catch (err: any) {
-      console.error('Failed to save advisor notes:', err);
+      console.error('Failed to save grades:', err);
       setToast({
         isOpen: true,
         type: 'error',
-        message: `Failed to save notes: ${err.message || 'Check database permissions.'}`
+        message: `Failed to save grades: ${err.message || 'Check database permissions.'}`
       });
     } finally {
       setSavingData(false);
@@ -258,13 +302,13 @@ function StudentDetailModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-vom-green to-emerald-800 text-white px-6 py-5 flex justify-between items-center">
+        <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white px-6 py-5 flex justify-between items-center">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
+            <div className="w-12 h-12 rounded-full bg-vom-gold/20 flex items-center justify-center text-vom-gold font-bold text-lg">
               <User className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">{student.name}</h2>
+              <h2 className="text-xl font-bold text-vom-gold">{student.name}</h2>
               <p className="text-xs text-white/80">{student.matricNumber || 'Matric Pending'} • {student.program} ({student.level})</p>
             </div>
           </div>
@@ -281,11 +325,11 @@ function StudentDetailModal({
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-center">
               <p className="text-xs text-gray-500 font-semibold uppercase">Calculated CGPA</p>
               <p className="text-2xl font-black text-gray-900 mt-1">{student.cgpa}</p>
-              <p className="text-xs font-bold text-vom-green mt-1">{student.cgpaCategory}</p>
+              <p className="text-xs font-bold text-vom-gold mt-1">{student.cgpaCategory}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-center">
               <p className="text-xs text-gray-500 font-semibold uppercase">Registered Modules</p>
-              <p className="text-2xl font-black text-vom-green mt-1">{activeCourseList.length}</p>
+              <p className="text-2xl font-black text-vom-gold mt-1">{activeCourseList.length}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-center">
               <p className="text-xs text-gray-500 font-semibold uppercase">Carryovers</p>
@@ -295,53 +339,69 @@ function StudentDetailModal({
             </div>
           </div>
 
-          {/* Enrolled Courses (Read Only) */}
+          {/* Enrolled Courses & Grading Table */}
           <div>
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-bold text-gray-900 text-base flex items-center">
-                <BookOpen className="w-5 h-5 text-vom-green mr-2" /> Academic Records (View Only)
+                <BookOpen className="w-5 h-5 text-gray-700 mr-2" /> Official Course Grades
               </h3>
-              <span className="text-xs text-amber-600 font-semibold flex items-center bg-amber-50 px-2 py-1 rounded">
-                 <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Only Admins can edit grades
-              </span>
+              <span className="text-xs text-gray-400 font-semibold">Admin Edit Mode</span>
             </div>
 
-            <div className="border border-gray-100 rounded-xl overflow-hidden shadow-xs">
+            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
               <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-gray-500 font-semibold text-xs border-b border-gray-100">
+                <thead className="bg-gray-100 text-gray-600 font-semibold text-xs border-b border-gray-200">
                   <tr>
                     <th className="py-3 px-4">Code</th>
                     <th className="py-3 px-4">Course Title</th>
-                    <th className="py-3 px-4">Semester</th>
+                    <th className="py-3 px-4">Sem</th>
                     <th className="py-3 px-4">Credits</th>
-                    <th className="py-3 px-4">Grade</th>
+                    <th className="py-3 px-4">Assign Grade</th>
                     <th className="py-3 px-4">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {activeCourseList.map(c => {
-                    const existing = studentEnrollments.find(e => e.courseCode === c.courseCode);
-                    const currentGrade = existing?.grade || '-';
-                    const currentStatus = existing?.status || 'in_progress';
+                    const currentGrade = gradeState[c.courseCode]?.grade || '-';
+                    const currentStatus = gradeState[c.courseCode]?.status || 'in_progress';
                     return (
-                      <tr key={c.courseCode} className="hover:bg-gray-50/50">
-                        <td className="py-3 px-4 font-bold text-vom-green">{c.courseCode}</td>
+                      <tr key={c.courseCode} className="hover:bg-gray-50">
+                        <td className="py-3 px-4 font-bold text-gray-700">{c.courseCode}</td>
                         <td className="py-3 px-4 text-gray-800 font-medium">{c.title}</td>
-                        <td className="py-3 px-4 text-gray-500">Sem {c.semester}</td>
-                        <td className="py-3 px-4 text-gray-500">{c.creditUnits} Units</td>
+                        <td className="py-3 px-4 text-gray-500">{c.semester}</td>
+                        <td className="py-3 px-4 text-gray-500">{c.creditUnits}</td>
                         
-                        <td className="py-3 px-4 font-bold">
-                          {currentGrade}
+                        {/* Grade Dropdown */}
+                        <td className="py-3 px-4">
+                          <select
+                            value={currentGrade}
+                            onChange={(e) => handleGradeChange(c.courseCode, 'grade', e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded-lg text-xs font-bold focus:ring-2 focus:ring-gray-900 outline-none bg-white"
+                          >
+                            <option value="-">- (Pending)</option>
+                            <option value="A">A (4.0)</option>
+                            <option value="B">B (3.0)</option>
+                            <option value="C">C (2.0)</option>
+                            <option value="D">D (1.0)</option>
+                            <option value="F">F (0.0)</option>
+                          </select>
                         </td>
 
+                        {/* Status Dropdown */}
                         <td className="py-3 px-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                              currentStatus === 'passed' ? 'bg-green-100 text-green-700' :
-                              currentStatus === 'failed' ? 'bg-red-100 text-red-700' :
-                              'bg-amber-100 text-amber-800'
-                            }`}>
-                            {currentStatus === 'in_progress' ? 'In Progress' : currentStatus === 'passed' ? 'Passed' : 'Carryover'}
-                          </span>
+                          <select
+                            value={currentStatus}
+                            onChange={(e) => handleGradeChange(c.courseCode, 'status', e.target.value)}
+                            className={`px-2 py-1 rounded-lg text-xs font-bold outline-none border ${
+                              currentStatus === 'passed' ? 'bg-green-50 text-green-700 border-green-200' :
+                              currentStatus === 'failed' ? 'bg-red-50 text-red-700 border-red-200' :
+                              'bg-amber-50 text-amber-800 border-amber-200'
+                            }`}
+                          >
+                            <option value="in_progress">In Progress</option>
+                            <option value="passed">Passed</option>
+                            <option value="failed">Carryover</option>
+                          </select>
                         </td>
                       </tr>
                     );
@@ -351,44 +411,22 @@ function StudentDetailModal({
             </div>
           </div>
 
-          {/* Advisor Notes Section */}
-          <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-gray-900 text-sm flex items-center">
-                <FileText className="w-4 h-4 text-vom-green mr-2" /> Advisor Guidance & Recommendations
-              </h3>
-              {savedSuccess && (
-                <span className="text-xs font-bold text-green-700 flex items-center bg-green-100 px-2.5 py-1 rounded-full">
-                  <CheckCircle className="w-3.5 h-3.5 mr-1" /> Notes Saved Successfully!
-                </span>
-              )}
-            </div>
-
-            <textarea
-              rows={3}
-              value={noteText}
-              onChange={e => setNoteText(e.target.value)}
-              placeholder="Write advisement notes, academic warning details, or approval comments for this student..."
-              className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-vom-green focus:border-transparent outline-none bg-white"
-            />
-          </div>
-
           {/* Submit Button Bar */}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
               className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm rounded-xl transition-colors"
             >
-              Cancel
+              Close
             </button>
             <button
               type="submit"
               disabled={savingData}
-              className="flex items-center px-6 py-2.5 bg-vom-green hover:bg-vom-green-light text-white font-bold text-sm rounded-xl transition-colors shadow-md shadow-vom-green/20 disabled:opacity-50"
+              className="flex items-center px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-bold text-sm rounded-xl transition-colors shadow-md disabled:opacity-50"
             >
               <Save className="w-4 h-4 mr-2" />
-              {savingData ? 'Saving...' : 'Save Advisor Notes'}
+              {savingData ? 'Saving Grades...' : 'Save Academic Records'}
             </button>
           </div>
 

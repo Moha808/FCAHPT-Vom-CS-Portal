@@ -67,8 +67,8 @@ export default function AdminLogin() {
         </div>
 
         {/* Logo */}
-        <div className="w-16 h-16 bg-vom-green rounded-2xl mx-auto flex items-center justify-center mb-5 shadow-lg shadow-vom-green/30">
-          <ShieldCheck className="w-8 h-8 text-vom-gold" />
+        <div className="mx-auto mb-5 w-20 h-20 rounded-2xl overflow-hidden shadow-lg shadow-vom-green/30 bg-white p-1">
+          <img src="/logo.png" alt="FCAHPT Vom Logo" className="w-full h-full object-cover rounded-xl" />
         </div>
 
         <h1 className="text-3xl font-extrabold text-white">Staff Portal</h1>

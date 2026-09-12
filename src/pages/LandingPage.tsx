@@ -16,9 +16,11 @@ export default function LandingPage() {
           <div className="flex justify-between h-20 items-center">
             {/* Brand Logo */}
             <Link to="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 bg-vom-green group-hover:bg-vom-green-light transition-colors rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md shadow-vom-green/20">
-                <ShieldCheck className="w-6 h-6 text-vom-gold" />
-              </div>
+              <img 
+                src="/logo.png" 
+                alt="FCAHPT Vom Logo" 
+                className="w-12 h-12 rounded-xl object-cover shadow-md"
+              />
               <div>
                 <span className="font-extrabold text-xl text-gray-900 block leading-tight tracking-tight">FCAHPT Vom</span>
                 <span className="text-xs text-vom-green font-semibold tracking-wider uppercase">Computer Science Dept</span>

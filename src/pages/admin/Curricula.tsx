@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { Course } from '../../types';
 import { BookMarked, Search, Plus, X, CheckCircle, AlertCircle, Upload, FileText } from 'lucide-react';
+import ToastModal from '../../components/ToastModal';
 
 export default function AdminCurricula() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [toast, setToast] = useState<{ isOpen: boolean; type: 'success' | 'error'; message: string }>({
+    isOpen: false,
+    type: 'success',
+    message: ''
+  });
 
   useEffect(() => {
     fetchCourses();
@@ -22,6 +29,17 @@ export default function AdminCurricula() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteCourse = async (courseCode: string) => {
+    if (!window.confirm(`Are you sure you want to delete course ${courseCode}?`)) return;
+    try {
+      await deleteDoc(doc(db, 'courses', courseCode));
+      setCourses(courses.filter(c => c.courseCode !== courseCode));
+      setToast({ isOpen: true, type: 'success', message: `Course ${courseCode} deleted.` });
+    } catch (err) {
+      setToast({ isOpen: true, type: 'error', message: 'Failed to delete course.' });
     }
   };
 
@@ -115,11 +133,12 @@ export default function AdminCurricula() {
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Dept</th>
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Level & Sem</th>
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Prerequisites</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredCourses.length === 0 ? (
-                <tr><td colSpan={6} className="py-8 text-center text-gray-500">No courses found.</td></tr>
+                <tr><td colSpan={7} className="py-8 text-center text-gray-500">No courses found.</td></tr>
               ) : (
                 filteredCourses.map(course => (
                   <tr key={course.courseCode} className="hover:bg-gray-50 transition-colors">
@@ -139,6 +158,14 @@ export default function AdminCurricula() {
                         '—'
                       )}
                     </td>
+                    <td className="py-4 px-6 text-sm text-right space-x-2">
+                      <button onClick={() => setEditingCourse(course)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Edit Course">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      </button>
+                      <button onClick={() => handleDeleteCourse(course.courseCode)} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete Course">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -154,6 +181,147 @@ export default function AdminCurricula() {
           onSuccess={() => { setShowAddModal(false); fetchCourses(); }}
         />
       )}
+
+      {/* Edit Course Modal */}
+      {editingCourse && (
+        <EditCourseModal 
+          course={editingCourse}
+          onClose={() => setEditingCourse(null)}
+          onSuccess={() => { setEditingCourse(null); fetchCourses(); setToast({ isOpen: true, type: 'success', message: 'Course updated successfully.' }); }}
+        />
+      )}
+
+      <ToastModal
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+      />
+    </div>
+  );
+}
+
+// ── Edit Course Modal Component ───────────────────────────────────────────────
+function EditCourseModal({ course, onClose, onSuccess }: { course: Course; onClose: () => void; onSuccess: () => void }) {
+  const [formData, setFormData] = useState({
+    courseCode: course.courseCode,
+    title: course.title,
+    creditUnits: course.creditUnits,
+    department: course.department,
+    level: course.level,
+    semester: course.semester,
+    prerequisitesRaw: course.prerequisites.join(', '),
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'creditUnits' || name === 'semester' ? Number(value) : value
+    }));
+  };
+
+  const handleSingleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!formData.title.trim()) { setError('Course title is required.'); return; }
+
+    setLoading(true);
+    try {
+      const prereqs = formData.prerequisitesRaw
+        ? formData.prerequisitesRaw.split(',').map(p => p.trim().toUpperCase()).filter(Boolean)
+        : [];
+
+      const updatedCourse: Course = {
+        courseCode: course.courseCode,
+        title: formData.title.trim(),
+        creditUnits: formData.creditUnits,
+        department: formData.department,
+        level: formData.level,
+        semester: formData.semester,
+        prerequisites: prereqs,
+      };
+
+      await setDoc(doc(db, 'courses', course.courseCode), updatedCourse);
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to edit course.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <h3 className="text-lg font-bold text-gray-900">Edit Course: {course.courseCode}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <form onSubmit={handleSingleSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-md flex items-start">
+                <AlertCircle className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase">Course Code</label>
+                <input type="text" value={formData.courseCode} disabled className="mt-1 block w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase">Credit Units</label>
+                <input type="number" name="creditUnits" required min={1} max={6} value={formData.creditUnits} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-vom-green outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase">Course Title</label>
+              <input type="text" name="title" required value={formData.title} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-vom-green outline-none" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase">Target Level</label>
+                <select name="level" value={formData.level} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-vom-green outline-none bg-white">
+                  <option value="ND 1">ND 1</option>
+                  <option value="ND 2">ND 2</option>
+                  <option value="HND 1">HND 1</option>
+                  <option value="HND 2">HND 2</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase">Semester</label>
+                <select name="semester" value={formData.semester} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-vom-green outline-none bg-white">
+                  <option value={1}>Semester 1</option>
+                  <option value={2}>Semester 2</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase">Prerequisites (Optional)</label>
+              <input type="text" name="prerequisitesRaw" placeholder="Comma separated course codes" value={formData.prerequisitesRaw} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-vom-green outline-none" />
+            </div>
+
+            <div className="pt-2 flex gap-3">
+              <button type="button" onClick={onClose} className="flex-1 py-2.5 px-4 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button type="submit" disabled={loading} className="flex-1 py-2.5 px-4 bg-vom-green hover:bg-vom-green-light text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50">
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

@@ -14,6 +14,9 @@ export interface UserData {
   advisorName?: string;
   advisorEmail?: string;
   advisorPhone?: string;
+  isActive?: boolean;
+  cgpa?: string;
+  cgpaCategory?: string;
 }
 
 export interface Complaint {

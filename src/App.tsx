@@ -17,9 +17,13 @@ import AdvisorStudents from './pages/advisor/Students';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminReports from './pages/admin/Reports';
 import AdminCurricula from './pages/admin/Curricula';
+import AdminRecords from './pages/admin/Records';
 
 import AnnouncementsManager from './pages/shared/AnnouncementsManager';
 import Settings from './pages/shared/Settings';
+
+import StudentHistory from './pages/student/History';
+import AdvisorReports from './pages/advisor/Reports';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -42,6 +46,7 @@ function App() {
           {/* Student Routes */}
           <Route path="/student/dashboard" element={<ProtectedRoute allowedRoles={['student']}><StudentDashboard /></ProtectedRoute>} />
           <Route path="/student/courses" element={<ProtectedRoute allowedRoles={['student']}><StudentCourses /></ProtectedRoute>} />
+          <Route path="/student/history" element={<ProtectedRoute allowedRoles={['student']}><StudentHistory /></ProtectedRoute>} />
           <Route path="/student/announcements" element={<ProtectedRoute allowedRoles={['student']}><StudentAnnouncements /></ProtectedRoute>} />
           <Route path="/student/advisor" element={<ProtectedRoute allowedRoles={['student']}><StudentAdvisor /></ProtectedRoute>} />
           <Route path="/student/complaints" element={<ProtectedRoute allowedRoles={['student']}><StudentComplaints /></ProtectedRoute>} />
@@ -50,6 +55,7 @@ function App() {
           {/* Advisor Routes */}
           <Route path="/advisor/dashboard" element={<ProtectedRoute allowedRoles={['advisor']}><AdvisorDashboard /></ProtectedRoute>} />
           <Route path="/advisor/students" element={<ProtectedRoute allowedRoles={['advisor']}><AdvisorStudents /></ProtectedRoute>} />
+          <Route path="/advisor/reports" element={<ProtectedRoute allowedRoles={['advisor']}><AdvisorReports /></ProtectedRoute>} />
           <Route path="/advisor/announcements" element={<ProtectedRoute allowedRoles={['advisor']}><AnnouncementsManager /></ProtectedRoute>} />
           <Route path="/advisor/settings" element={<ProtectedRoute allowedRoles={['advisor']}><Settings /></ProtectedRoute>} />
           
@@ -57,6 +63,7 @@ function App() {
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/curricula" element={<ProtectedRoute allowedRoles={['admin']}><AdminCurricula /></ProtectedRoute>} />
+          <Route path="/admin/records" element={<ProtectedRoute allowedRoles={['admin']}><AdminRecords /></ProtectedRoute>} />
           <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={['admin']}><AnnouncementsManager /></ProtectedRoute>} />
           <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['admin']}><AdminReports /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute>} />

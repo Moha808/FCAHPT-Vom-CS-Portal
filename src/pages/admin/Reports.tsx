@@ -1,27 +1,53 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { Complaint } from '../../types';
+import { Complaint, UserData, Course, Enrollment } from '../../types';
+import { calculateCGPA } from '../../lib/academicLogic';
 import { BarChart3, MessageSquare, CheckCircle, Clock, Send } from 'lucide-react';
+import { ALL_COURSES } from '../../lib/defaultCourses';
 
 export default function AdminReports() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [stats, setStats] = useState({ avgCgpa: '0.00', totalStudents: 0 });
   const [loading, setLoading] = useState(true);
   const [replyingId, setReplyingId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [savingReply, setSavingReply] = useState(false);
 
   useEffect(() => {
-    fetchComplaints();
+    fetchData();
   }, []);
 
-  const fetchComplaints = async () => {
+  const fetchData = async () => {
     try {
+      // 1. Fetch Complaints
       const snap = await getDocs(collection(db, 'complaints'));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Complaint));
-      // Sort newest first
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setComplaints(list);
+
+      // 2. Fetch Real Analytics for Students
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const students = usersSnap.docs.map(d => d.data() as UserData).filter(u => u.role === 'student');
+      
+      const enrollmentsSnap = await getDocs(collection(db, 'enrollments'));
+      const allEnrollments = enrollmentsSnap.docs.map(d => d.data() as Enrollment);
+      
+      const coursesSnap = await getDocs(collection(db, 'courses'));
+      const allCourses = coursesSnap.docs.length > 0 ? coursesSnap.docs.map(d => d.data() as Course) : ALL_COURSES;
+
+      let totalCgpa = 0;
+      students.forEach(student => {
+        const studentEnrollments = allEnrollments.filter(e => e.studentId === student.uid);
+        const cgpa = parseFloat(calculateCGPA(studentEnrollments, allCourses));
+        totalCgpa += cgpa;
+      });
+
+      setStats({
+        avgCgpa: students.length > 0 ? (totalCgpa / students.length).toFixed(2) : '0.00',
+        totalStudents: students.length,
+      });
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -40,7 +66,7 @@ export default function AdminReports() {
       });
       setReplyText('');
       setReplyingId(null);
-      fetchComplaints();
+      fetchData();
     } catch (err) {
       console.error('Error resolving complaint:', err);
     } finally {
@@ -64,8 +90,8 @@ export default function AdminReports() {
             <BarChart3 className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">CS Dept Average CGPA</p>
-            <h3 className="text-2xl font-black text-gray-900">3.25</h3>
+            <p className="text-xs font-semibold text-gray-500 uppercase">Average CGPA (All Students)</p>
+            <h3 className="text-2xl font-black text-gray-900">{stats.avgCgpa}</h3>
           </div>
         </div>
 

@@ -4,8 +4,9 @@ export const calculateCGPA = (enrollments: Enrollment[], courses: Course[]) => {
   let totalPoints = 0;
   let totalCredits = 0;
 
+  // 4.0 Grading Scale
   const gradePoints: Record<string, number> = {
-    'A': 5.0, 'B': 4.0, 'C': 3.0, 'D': 2.0, 'E': 1.0, 'F': 0.0
+    'A': 4.0, 'B': 3.0, 'C': 2.0, 'D': 1.0, 'F': 0.0
   };
 
   enrollments.forEach(enc => {
@@ -20,6 +21,17 @@ export const calculateCGPA = (enrollments: Enrollment[], courses: Course[]) => {
   });
 
   return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : '0.00';
+};
+
+export const getCGPACategory = (cgpaStr: string): string => {
+  const cgpa = parseFloat(cgpaStr);
+  if (cgpa === 0 && cgpaStr === '0.00') return 'Awaiting Grading';
+  
+  if (cgpa >= 3.50) return 'Distinction';
+  if (cgpa >= 3.00) return 'Upper Credit';
+  if (cgpa >= 2.49) return 'Lower Credit';
+  if (cgpa >= 2.00) return 'Pass';
+  return 'Fail';
 };
 
 export const getDegreeAudit = (enrollments: Enrollment[], curriculum: Curriculum | null, courses: Course[]) => {

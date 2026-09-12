@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDataStore } from '../../store/useDataStore';
-import { calculateCGPA, getDegreeAudit, getCourseRecommendations } from '../../lib/academicLogic';
+import { calculateCGPA, getDegreeAudit, getCourseRecommendations, getCGPACategory } from '../../lib/academicLogic';
 import { getDefaultCourses } from '../../lib/defaultCourses';
 import {
   Award, GraduationCap, CheckCircle2, Clock, AlertTriangle, BookOpen, ChevronRight, TrendingUp
@@ -73,11 +73,7 @@ export default function StudentDashboard() {
     { name: 'Pending', value: pendingCount, fill: '#f59e0b' },
   ];
 
-  const cgpaLabel =
-    parseFloat(cgpa) >= 3.5 ? 'Distinction' :
-    parseFloat(cgpa) >= 3.0 ? 'Upper Credit' :
-    parseFloat(cgpa) >= 2.5 ? 'Lower Credit' :
-    parseFloat(cgpa) >= 2.0 ? 'Pass' : 'Awaiting Grading';
+  const cgpaLabel = getCGPACategory(cgpa);
 
   if (loading) {
     return (
@@ -139,6 +135,52 @@ export default function StudentDashboard() {
           color="amber"
         />
       </div>
+
+      {/* ── CGPA Standing Banner ─────────────────────────────────────── */}
+      {passedCount > 0 && (
+        <div className={`rounded-2xl border p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm ${
+          cgpaLabel === 'Distinction'    ? 'bg-emerald-50 border-emerald-200' :
+          cgpaLabel === 'Upper Credit'  ? 'bg-blue-50 border-blue-200' :
+          cgpaLabel === 'Lower Credit'  ? 'bg-purple-50 border-purple-200' :
+          cgpaLabel === 'Pass'          ? 'bg-amber-50 border-amber-200' :
+          'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-center gap-4">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black flex-shrink-0 ${
+              cgpaLabel === 'Distinction'    ? 'bg-emerald-100 text-emerald-700' :
+              cgpaLabel === 'Upper Credit'  ? 'bg-blue-100 text-blue-700' :
+              cgpaLabel === 'Lower Credit'  ? 'bg-purple-100 text-purple-700' :
+              cgpaLabel === 'Pass'          ? 'bg-amber-100 text-amber-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              {cgpa}
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-0.5">Current Academic Standing</p>
+              <p className={`text-2xl font-extrabold ${
+                cgpaLabel === 'Distinction'    ? 'text-emerald-700' :
+                cgpaLabel === 'Upper Credit'  ? 'text-blue-700' :
+                cgpaLabel === 'Lower Credit'  ? 'text-purple-700' :
+                cgpaLabel === 'Pass'          ? 'text-amber-700' :
+                'text-red-700'
+              }`}>{cgpaLabel}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                CGPA {cgpa} / 4.0 &nbsp;•&nbsp; {userData?.level} &nbsp;•&nbsp; {userData?.program}
+              </p>
+            </div>
+          </div>
+          <div className="text-right sm:text-right">
+            <div className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-wide">CGPA Scale</div>
+            <div className="text-xs space-y-0.5 text-gray-600">
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> 3.5 – 4.0 — Distinction</div>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span> 3.0 – 3.49 — Upper Credit</div>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-purple-500 inline-block"></span> 2.49 – 2.99 — Lower Credit</div>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> 2.0 – 2.49 — Pass</div>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span> 0 – 1.9 — Fail</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Progress & Audit Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

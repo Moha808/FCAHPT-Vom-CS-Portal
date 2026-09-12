@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth';
 import {
   LayoutDashboard, BookOpen, Bell, LogOut, Settings,
   Users, Megaphone, BookMarked,
-  UserCheck, BarChart3, ShieldCheck, ChevronRight,
+  UserCheck, BarChart3, ChevronRight,
   Menu, X, MessageSquare
 } from 'lucide-react';
 
@@ -14,6 +14,7 @@ const navConfig = {
   student: [
     { label: 'Dashboard',      path: '/student/dashboard',      icon: LayoutDashboard },
     { label: 'My Courses',     path: '/student/courses',         icon: BookOpen },
+    { label: 'Academic History',path: '/student/history',        icon: BookMarked },
     { label: 'Announcements',  path: '/student/announcements',   icon: Bell },
     { label: 'My Advisor',     path: '/student/advisor',         icon: UserCheck },
     { label: 'Complaints',     path: '/student/complaints',      icon: MessageSquare },
@@ -23,12 +24,14 @@ const navConfig = {
     { label: 'Dashboard',      path: '/advisor/dashboard',       icon: LayoutDashboard },
     { label: 'My Students',    path: '/advisor/students',        icon: Users },
     { label: 'Announcements',  path: '/advisor/announcements',   icon: Megaphone },
+    { label: 'Reports',        path: '/advisor/reports',         icon: BarChart3 },
     { label: 'Settings',       path: '/advisor/settings',        icon: Settings },
   ],
   admin: [
     { label: 'Dashboard',      path: '/admin/dashboard',         icon: LayoutDashboard },
     { label: 'User Management',path: '/admin/users',             icon: Users },
     { label: 'Curricula',      path: '/admin/curricula',         icon: BookMarked },
+    { label: 'Academic Records',path: '/admin/records',          icon: BookOpen },
     { label: 'Announcements',  path: '/admin/announcements',     icon: Megaphone },
     { label: 'Reports',        path: '/admin/reports',           icon: BarChart3 },
     { label: 'Settings',       path: '/admin/settings',          icon: Settings },
@@ -105,11 +108,13 @@ export default function Layout() {
         </button>
 
         {/* Brand */}
-        <div className="px-6 py-5 border-b border-white/10 mt-2 md:mt-0">
+        <div className="px-6 py-4 border-b border-white/10 mt-2 md:mt-0">
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 bg-vom-gold rounded-lg flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5 text-vom-green" />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="FCAHPT Vom Logo" 
+              className="w-11 h-11 rounded-lg object-cover flex-shrink-0 bg-white p-0.5"
+            />
             <div>
               <p className="font-bold text-white text-sm leading-tight">FCAHPT Vom</p>
               <p className="text-xs text-white/60">Academic Portal</p>

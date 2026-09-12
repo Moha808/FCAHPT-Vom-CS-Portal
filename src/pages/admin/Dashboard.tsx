@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, updateDoc, doc, addDoc } from 'firebase/firestore';
 import { UserData } from '../../types';
-import { Users, ShieldCheck, GraduationCap, UserPlus, X, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { Users, ShieldCheck, GraduationCap, UserPlus, X, Eye, EyeOff, AlertCircle, CheckCircle, Edit, Trash2 } from 'lucide-react';
 import ToastModal from '../../components/ToastModal';
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [toast, setToast] = useState<{ isOpen: boolean; type: 'success' | 'error'; message: string }>({
     isOpen: false,
     type: 'success',
@@ -102,6 +103,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeactivate = async (userId: string, currentStatus: boolean) => {
+    if (!window.confirm(`Are you sure you want to ${currentStatus === false ? 'reactivate' : 'deactivate'} this account?`)) return;
+    try {
+      await updateDoc(doc(db, 'users', userId), { isActive: currentStatus === false ? true : false });
+      setUsers(users.map(u => u.uid === userId ? { ...u, isActive: currentStatus === false ? true : false } : u));
+      setToast({ isOpen: true, type: 'success', message: `Account ${currentStatus === false ? 'reactivated' : 'deactivated'}.` });
+    } catch {
+      setToast({ isOpen: true, type: 'error', message: 'Failed to update account status.' });
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vom-green"></div></div>;
 
   const students = users.filter(u => u.role === 'student');
@@ -141,31 +153,41 @@ export default function AdminDashboard() {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Name</th>
-                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Email</th>
-                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Program / Dept</th>
-                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Role</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Email / Matric</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Role / Dept</th>
                 <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Assigned Advisor</th>
-                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Change Role</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {users.length === 0 ? (
-                <tr><td colSpan={6} className="py-8 text-center text-gray-500">No users found.</td></tr>
+                <tr><td colSpan={5} className="py-8 text-center text-gray-500">No users found.</td></tr>
               ) : (
                 users.map(user => (
-                  <tr key={user.uid} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-6 text-sm font-medium text-gray-900">{user.name}</td>
-                    <td className="py-4 px-6 text-sm text-gray-600">{user.email}</td>
+                  <tr key={user.uid} className={`hover:bg-gray-50 transition-colors ${user.isActive === false ? 'opacity-50' : ''}`}>
+                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
+                      {user.name}
+                      {user.isActive === false && <span className="ml-2 text-xs text-red-500 font-bold">(Deactivated)</span>}
+                    </td>
                     <td className="py-4 px-6 text-sm text-gray-600">
-                      {user.role === 'admin' ? '—' : (user.program || user.department || '—')}
+                      {user.email}<br/>
+                      <span className="text-xs text-gray-400 font-mono">{user.matricNumber || ''}</span>
                     </td>
                     <td className="py-4 px-6 text-sm">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize
-                        ${user.role === 'admin' ? 'bg-green-100 text-green-700' :
-                          user.role === 'advisor' ? 'bg-purple-100 text-purple-700' :
-                          'bg-blue-100 text-blue-700'}`}>
-                        {user.role}
-                      </span>
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.uid, e.target.value as any)}
+                        className={`px-2 py-1 rounded-full text-xs font-semibold capitalize focus:ring-2 focus:ring-vom-green outline-none
+                          ${user.role === 'admin' ? 'bg-green-100 text-green-700' :
+                            user.role === 'advisor' ? 'bg-purple-100 text-purple-700' :
+                            'bg-blue-100 text-blue-700'}`}
+                      >
+                        <option value="student">Student</option>
+                        <option value="advisor">Advisor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <br/>
+                      <span className="text-xs text-gray-500 mt-1 block">{user.role === 'admin' ? 'System' : (user.program || user.department || '—')}</span>
                     </td>
                     <td className="py-4 px-6 text-sm">
                       {user.role === 'student' ? (
@@ -183,16 +205,13 @@ export default function AdminDashboard() {
                         <span className="text-gray-400 text-xs">N/A</span>
                       )}
                     </td>
-                    <td className="py-4 px-6 text-sm">
-                      <select
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user.uid, e.target.value as any)}
-                        className="border border-gray-300 rounded-md text-sm px-2 py-1.5 focus:ring-2 focus:ring-vom-green focus:border-transparent outline-none bg-white"
-                      >
-                        <option value="student">Student</option>
-                        <option value="advisor">Advisor</option>
-                        <option value="admin">Admin</option>
-                      </select>
+                    <td className="py-4 px-6 text-sm text-right space-x-2">
+                      <button onClick={() => setEditingUser(user)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit Profile">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDeactivate(user.uid, user.isActive !== false ? true : false)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title={user.isActive === false ? 'Reactivate' : 'Deactivate'}>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -207,6 +226,15 @@ export default function AdminDashboard() {
         <CreateStaffModal
           onClose={() => setShowCreateModal(false)}
           onSuccess={() => { setShowCreateModal(false); fetchUsers(); }}
+        />
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <EditUserModal 
+          user={editingUser} 
+          onClose={() => setEditingUser(null)} 
+          onSuccess={() => { setEditingUser(null); fetchUsers(); setToast({ isOpen: true, type: 'success', message: 'User updated successfully.' }); }} 
         />
       )}
 
@@ -384,6 +412,126 @@ function CreateStaffModal({ onClose, onSuccess }: { onClose: () => void; onSucce
               </div>
             </form>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit User Modal Component ───────────────────────────────────────────────
+function EditUserModal({ user, onClose, onSuccess }: { user: UserData, onClose: () => void, onSuccess: () => void }) {
+  const [formData, setFormData] = useState({
+    name: user.name || '',
+    email: user.email || '',
+    phone: user.phone || '',
+    matricNumber: user.matricNumber || '',
+    department: user.department || 'Computer Science',
+    program: user.program || '',
+    level: user.level || '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), formData);
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900">Edit User Profile</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-md flex items-start">
+                <AlertCircle className="w-4 h-4 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Full Name</label>
+              <input type="text" name="name" required value={formData.name} onChange={handleChange}
+                className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email Address (Cannot change login email here)</label>
+              <input type="email" name="email" required value={formData.email} onChange={handleChange} disabled
+                className="mt-1 block w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 sm:text-sm cursor-not-allowed" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                <input type="text" name="phone" value={formData.phone} onChange={handleChange}
+                  className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Matric Number</label>
+                <input type="text" name="matricNumber" value={formData.matricNumber} onChange={handleChange}
+                  className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm" />
+              </div>
+            </div>
+
+            {user.role === 'student' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Program</label>
+                  <select name="program" value={formData.program} onChange={handleChange}
+                    className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm bg-white">
+                    <option value="">Select...</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Computer Networking">Computer Networking</option>
+                    <option value="Software Development">Software Development</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Level</label>
+                  <select name="level" value={formData.level} onChange={handleChange}
+                    className="mt-1 block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-vom-green sm:text-sm bg-white">
+                    <option value="">Select...</option>
+                    <option value="ND 1">ND 1</option>
+                    <option value="ND 2">ND 2</option>
+                    <option value="HND 1">HND 1</option>
+                    <option value="HND 2">HND 2</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex gap-3">
+              <button type="button" onClick={onClose}
+                className="flex-1 py-2.5 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button type="submit" disabled={loading}
+                className="flex-1 py-2.5 px-4 bg-vom-green hover:bg-vom-green-light text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

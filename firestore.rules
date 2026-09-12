@@ -2,8 +2,86 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isAdvisor() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'advisor';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || isOwner(userId);
+    }
+
+    // Enrollments (Academic Records)
+    match /enrollments/{enrollmentId} {
+      allow read: if isAuthenticated();
+      // ONLY ADMIN can modify academic records now
+      allow write: if isAdmin();
+    }
+
+    // Courses & Curricula
+    match /courses/{courseId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    match /curricula/{curId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Advisor Notes
+    match /advisorNotes/{noteId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isAdvisor();
+    }
+
+    // Complaints
+    match /complaints/{complaintId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(request.resource.data.studentId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Announcements (all authenticated users can read; admin & advisors can write)
+    match /announcements/{annId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isAdvisor();
+    }
+
+    // Notifications (private per-student notifications, e.g. grade updates)
+    match /notifications/{notifId} {
+      // Student can only read their OWN notifications
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.recipientId || isAdmin()
+      );
+      // Only admin can create / update notifications
+      allow create: if isAdmin();
+      allow update: if isAdmin() || 
+        (isAuthenticated() && request.auth.uid == resource.data.recipientId);
+      allow delete: if isAdmin();
+    }
+    
+    // Default fallback
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }
